@@ -143,8 +143,9 @@ NOTES:
  *   Rating: 1
  */
 int bitXor(int x, int y) {
-  return 2;
+  return ~((~(~x & y)) & (~(x & ~y)));
 }
+
 /* 
  * tmin - return minimum two's complement integer 
  *   Legal ops: ! ~ & ^ | + << >>
@@ -152,9 +153,7 @@ int bitXor(int x, int y) {
  *   Rating: 1
  */
 int tmin(void) {
-
-  return 2;
-
+  return 1 << 31;
 }
 //2
 /*
@@ -165,8 +164,13 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
-  return 2;
+  return !(((x + x) | 0x1) + 1) & !!(x + 1);
+  // printf("~x = %x\n", ~x);
+  // printf("~x + ~x = %x\n", ~x + ~x);
+  // printf("!(~x + ~x) = %d\n", !(~x + ~x));
+  // return !(~x + ~x);
 }
+
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
  *   where bits are numbered from 0 (least significant) to 31 (most significant)
@@ -176,8 +180,10 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+  int mask = 0xAA + (0xAA << 8) + (0xAA << 16) + (0xAA << 24);
+  return !((x & mask) ^ mask);
 }
+
 /* 
  * negate - return -x 
  *   Example: negate(1) = -1.
@@ -186,8 +192,9 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+  return ~x + 1;
 }
+
 //3
 /* 
  * isAsciiDigit - return 1 if 0x30 <= x <= 0x39 (ASCII codes for characters '0' to '9')
@@ -199,8 +206,13 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+  int v0 = 0x30;
+  int v9 = 0x39;
+  int dif1 = x + (~v0) + 1;
+  int dif2 = v9 + (~x) + 1;
+  return !((dif1 >> 31) | (dif2 >> 31));
 }
+
 /* 
  * conditional - same as x ? y : z 
  *   Example: conditional(2,4,5) = 4
@@ -209,8 +221,13 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+  int bit2 = !x;
+  int bit1 = !bit2; 
+  int mask1 = (~bit1) + 1;
+  int mask2 = (~bit2) + 1;
+  return (y & mask1) | (z & mask2);
 }
+
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
  *   Example: isLessOrEqual(4,5) = 1.
@@ -219,8 +236,12 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+  int xSign = !!(x >> 31);
+  int ySign = !!(y >> 31);
+  int differ = y + (~x) + 1;
+  return !(!xSign & ySign) & ((xSign & !ySign) | ((differ >> 31) + 1));
 }
+
 //4
 /* 
  * logicalNeg - implement the ! operator, using all of 
@@ -231,8 +252,11 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
+  int negX = ~x + 1;
+  int sign = (negX | x) >> 31;
+  return sign + 1;
 }
+
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
  *  Examples: howManyBits(12) = 5
@@ -246,8 +270,31 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  return 0;
+  int sign = x >> 31;
+  int bit_16, bit_8, bit_4, bit_2, bit_1, bit_0;
+  int ret;
+  x = (x & (~sign)) | ((~x) & sign);
+
+  bit_16 = (!!(x >> 16)) << 4;
+  x = x >> bit_16;
+
+  bit_8 = (!!(x >> 8)) << 3;
+  x = x >> bit_8;
+
+  bit_4 = (!!(x >> 4)) << 2;
+  x = x >> bit_4;
+  
+  bit_2 = (!!(x >> 2)) << 1;
+  x = x >> bit_2;
+
+  bit_1 = !!(x >> 1);
+  x = x >> bit_1;
+
+  bit_0 = x;
+  ret = bit_16 + bit_8 + bit_4 + bit_2 + bit_1 + bit_0 + 1;
+  return ret;
 }
+
 //float
 /* 
  * floatScale2 - Return bit-level equivalent of expression 2*f for
