@@ -199,11 +199,11 @@ int isLessOrEqual(int x, int y) {
  *   Max ops: 12
  *   Rating: 4 
  */
-254 int logicalNeg(int x) {
-255   int negX = ~x + 1;
-256   int sign = (negX | x) >> 31;
-257   return sign + 1;
-258 }
+int logicalNeg(int x) {
+  int negX = ~x + 1;
+  int sign = (negX | x) >> 31;
+  return sign + 1;
+}
 ```
 
 以8位补码系统为例子, x位任意8位补码数字.
@@ -267,3 +267,149 @@ int howManyBits(int x) {
 
 * 15行与17行完成了当x为负数时将其转变为~x
 
+## floatScale2
+
+```c
+/* 
+ * floatScale2 - Return bit-level equivalent of expression 2*f for
+ *   floating point argument f.
+ *   Both the argument and result are passed as unsigned int's, but
+ *   they are to be interpreted as the bit-level representation of
+ *   single-precision floating point values.
+ *   When argument is NaN, return argument
+ *   Legal ops: Any integer/unsigned operations incl. ||, &&. also if, while
+ *   Max ops: 30
+ *   Rating: 4
+ */
+unsigned floatScale2(unsigned uf) {
+  int s = uf & 0x80000000;
+  int exp = uf & 0x7f800000;
+  int frac = uf & 0x007fffff;
+  if (exp == 0x7f800000) {
+    // uf is NaN or uf is Inf
+    return uf;
+  // uf is not NaN nor Inf
+  if (exp == 0) {
+    // uf is denorm
+    if (frac == 0x00400000) {
+      // uf transform from denorm to norm
+      frac = 0;
+      exp = 0x00800000;
+    } else {
+      // uf maintain denorm  
+      frac = frac << 1;
+    }
+    return s + exp + frac;
+  } else {
+    // uf is norm
+    exp = ((exp >> 23) + 1) << 23;
+    return s + exp + frac;
+  }
+}
+```
+
+s: 符号位; exp: 阶码; frac: 尾码
+
+* denorm: 如果不会乘2不会导致转为norm, 则将尾码左移一位; 否则添加隐藏首位并增加exp
+* norm: 阶码加一即可
+
+## floatFloat2Int
+
+```c
+/* 
+ * floatFloat2Int - Return bit-level equivalent of expression (int) f
+ *   for floating point argument f.
+ *   Argument is passed as unsigned int, but
+ *   it is to be interpreted as the bit-level representation of a
+ *   single-precision floating point value.
+ *   Anything out of range (including NaN and infinity) should return
+ *   0x80000000u.
+ *   Legal ops: Any integer/unsigned operations incl. ||, &&. also if, while
+ *   Max ops: 30
+ *   Rating: 4
+ */
+int floatFloat2Int(unsigned uf) {
+  int s = uf & 0x80000000;
+  int exp = uf & 0x7f800000;
+  int frac = uf & 0x007fffff;
+  int bias = 127;
+  int E;
+  int offset;
+  if (exp == 0x7f800000) {
+    // uf is NaN or Inf
+    return 0x80000000u;
+  }
+  // uf is not NaN nor Inf
+  E = (exp >> 23) - bias;
+
+  if (E < 0) {
+    // f is less than 1.
+    return 0;
+  } else if (E > 31) {
+    // f is out of range
+    return 0x80000000u;
+  } else {
+    // f is in the range
+    // add the first bit
+    frac = frac | 0x00800000;
+    if (E < 23) {
+      offset = 23 - E;
+      frac = frac >> offset;
+    } else {
+      offset = E - 23;
+      frac = frac << offset;
+    }
+    if (s < 0) {
+      frac = -frac;
+    }
+    return frac;
+  }
+}
+```
+
+排除Inf, NaN, 过大, 过小等情况后, 唯一需要处理的部分是: 将小数点后的位置0
+
+## floatPower2
+
+```c
+/* 
+ * floatPower2 - Return bit-level equivalent of the expression 2.0^x
+ *   (2.0 raised to the power x) for any 32-bit integer x.
+ *
+ *   The unsigned value that is returned should have the identical bit
+ *   representation as the single-precision floating-point number 2.0^x.
+ *   If the result is too small to be represented as a denorm, return
+ *   0. If too large, return +INF.
+ * 
+ *   Legal ops: Any integer/unsigned operations incl. ||, &&. Also if, while 
+ *   Max ops: 30 
+ *   Rating: 4
+ */
+unsigned floatPower2(int x) {
+  int exp;
+  int bias = 127;
+  int offset;
+  if (x < -149) {
+    // result is too small
+    return 0;
+  }
+  if (x > 127) {
+    // result is too large
+    return 0x7f800000;
+  }
+  if (x >= -126) {
+    // result can be represented as a norm
+    exp = (x + bias) << 23;
+    return exp;
+  } else {
+    // result can be represented as a denorm
+    exp = (x + bias) << 23;
+    offset = -126 - exp;
+    return exp + ((0x00800000) >> offset);
+    }
+}
+```
+
+
+首先排除过大过小的情况.
+然后根据x的大小来判断norm/denorm从而考虑唯一的为1的位在串中的位置即可.
