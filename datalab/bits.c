@@ -12,7 +12,6 @@
  * it's not good practice to ignore compiler warnings, but in this
  * case it's OK.  
  */
-
 #if 0
 /*
  * Instructions to Students:
@@ -308,8 +307,33 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-  return 2;
+  int s = uf & 0x80000000;
+  int exp = uf & 0x7f800000;
+  int frac = uf & 0x007fffff;
+  if (exp == 0x7f800000) {
+    // uf is NaN or uf is Inf
+    return uf;
+  } 
+
+  // uf is not NaN nor Inf
+  if (exp == 0) {
+    // uf is denorm
+    if (frac == 0x00400000) {
+      // uf transform from denorm to norm
+      frac = 0;
+      exp = 0x00800000;
+    } else {
+      // uf maintain denorm  
+      frac = frac << 1;
+    } 
+    return s + exp + frac;
+  } else {
+    // uf is norm
+    exp = ((exp >> 23) + 1) << 23;
+    return s + exp + frac;
+  }
 }
+
 /* 
  * floatFloat2Int - Return bit-level equivalent of expression (int) f
  *   for floating point argument f.
@@ -323,8 +347,43 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  return 2;
+  int s = uf & 0x80000000;
+  int exp = uf & 0x7f800000;
+  int frac = uf & 0x007fffff;
+  int bias = 127;
+  int E;
+  int offset;
+  if (exp == 0x7f800000) {
+    // uf is NaN or Inf
+    return 0x80000000u;
+  }
+  // uf is not NaN nor Inf
+  E = (exp >> 23) - bias;
+
+  if (E < 0) {
+    // f is less than 1.
+    return 0;
+  } else if (E > 31) {
+    // f is out of range
+    return 0x80000000u;  
+  } else {
+    // f is in the range
+    // add the first bit
+    frac = frac | 0x00800000; 
+    if (E < 23) {
+      offset = 23 - E;
+      frac = frac >> offset;
+    } else {
+      offset = E - 23;
+      frac = frac << offset;
+    }
+    if (s < 0) {
+      frac = -frac;
+    }
+    return frac;
+  } 
 }
+
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
  *   (2.0 raised to the power x) for any 32-bit integer x.
@@ -339,5 +398,26 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+  int exp;
+  int bias = 127;
+  int offset;
+  if (x < -149) {
+    // result is too small
+    return 0;
+  }
+  if (x > 127) {
+    // result is too large
+    return 0x7f800000;
+  }
+  if (x >= -126) {
+    // result can be represented as a norm
+    exp = (x + bias) << 23; 
+    return exp; 
+  } else {
+    // result can be represented as a denorm
+    exp = (x + bias) << 23;
+    offset = -126 - exp;
+    return exp + ((0x00800000) >> offset);
+    }
 }
+
