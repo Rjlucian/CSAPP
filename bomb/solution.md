@@ -273,3 +273,108 @@ $1 = 0x4025cf "%d %d"
 |   1   |   0    |
 |   0   |   0    |
 
+# phase_5
+
+```assembly
+0000000000401062 <phase_5>:
+  401062:       53                      push   %rbx
+  401063:       48 83 ec 20             sub    $0x20,%rsp
+  401067:       48 89 fb                mov    %rdi,%rbx
+  40106a:       64 48 8b 04 25 28 00    mov    %fs:0x28,%rax
+  401071:       00 00
+  401073:       48 89 44 24 18          mov    %rax,0x18(%rsp)
+  401078:       31 c0                   xor    %eax,%eax
+  // if input'length is not 6, bomb!
+  40107a:       e8 9c 02 00 00          call   40131b <string_length>
+  40107f:       83 f8 06                cmp    $0x6,%eax
+  401082:       74 4e                   je     4010d2 <phase_5+0x70>
+  401084:       e8 b1 03 00 00          call   40143a <explode_bomb>
+
+  401089:       eb 47                   jmp    4010d2 <phase_5+0x70>
+
+  40108b:       0f b6 0c 03             movzbl (%rbx,%rax,1),%ecx
+  40108f:       88 0c 24                mov    %cl,(%rsp)
+  401092:       48 8b 14 24             mov    (%rsp),%rdx
+  401096:       83 e2 0f                and    $0xf,%edx
+  401099:       0f b6 92 b0 24 40 00    movzbl 0x4024b0(%rdx),%edx
+  4010a0:       88 54 04 10             mov    %dl,0x10(%rsp,%rax,1)
+  4010a4:       48 83 c0 01             add    $0x1,%rax
+  4010a8:       48 83 f8 06             cmp    $0x6,%rax
+  4010ac:       75 dd                   jne    40108b <phase_5+0x29>
+  // append '\0' at the end of string
+  4010ae:       c6 44 24 16 00          movb   $0x0,0x16(%rsp)
+  // get a string from memory
+  4010b3:       be 5e 24 40 00          mov    $0x40245e,%esi
+  4010b8:       48 8d 7c 24 10          lea    0x10(%rsp),%rdi
+  // compare two strings
+  4010bd:       e8 76 02 00 00          call   401338 <strings_not_equal>
+  4010c2:       85 c0                   test   %eax,%eax
+  4010c4:       74 13                   je     4010d9 <phase_5+0x77>
+  4010c6:       e8 6f 03 00 00          call   40143a <explode_bomb>
+  4010cb:       0f 1f 44 00 00          nopl   0x0(%rax,%rax,1)
+  4010d0:       eb 07                   jmp    4010d9 <phase_5+0x77>
+
+  4010d2:       b8 00 00 00 00          mov    $0x0,%eax
+  4010d7:       eb b2                   jmp    40108b <phase_5+0x29>
+
+  4010d9:       48 8b 44 24 18          mov    0x18(%rsp),%rax
+  4010de:       64 48 33 04 25 28 00    xor    %fs:0x28,%rax
+  4010e5:       00 00
+  4010e7:       74 05                   je     4010ee <phase_5+0x8c>
+  4010e9:       e8 42 fa ff ff          call   400b30<__stack_chk_fail@plt>
+  4010ee:       48 83 c4 20             add    $0x20,%rsp
+  4010f2:       5b                      pop    %rbx
+  4010f3:       c3                      ret
+```
+
+0x40107f, 限定输入的长度必须为6.
+0x40108b-0x4010d7可以解释为以下伪码:
+
+```
+while (%eax !=  6) {
+    %cl = (%ebx + %eax);
+    $(rsp) = %cl;
+    %dl = %cl;
+    %dl = %dl & 0xf;
+    0x10(%rsp, %rax, 1) = 0x4024b0(%rdx);
+    %eax = %eax + 1;
+}
+```
+
+其意义即为, 遍历输入的字符串, 对于第i个字符, 进行如下操作:
+
+1. 取出该字符的低4位
+2. 以这个低四位值为偏移值, 0x4024b0为基地址组成的地址所在位置的字符, 并将这个字符放到地址为(0x10 + %rsp + %rax)的内存上去
+
+因此, 我们查看0x4024b0处的内容:
+```
+(gdb) print (char*) 0x4024b0
+$1 = 0x4024b0 <array> "maduiersnfotvbylSo you think you can stop the bomb with ctrl-c, do you?"
+```
+
+继续往下看, 0x4016ae为我们填入的六个字符补上了一个'\0', 使它们成为一个字符串, 随后与0x40245e处的字符串进行比较; 如果两个字符串不相等, 则炸弹爆炸. 
+查看0x40245e处的内容:
+
+```
+(gdb) print (char*) 0x40245e
+$2 = 0x40245e "flyers"
+```
+
+观察到, 'f', 'l', 'y', 'e', 'r', 's'六个字符在地址为0x4024b0的字符串中的偏移分别为9, 15, 14, 5, 6, 7. 也就是说, 我们输入的六个字符, 其低4位数字必须代表上述数字, 也就是低四位必须为:
+1001, 1111, 1110, 0101, 0110, 0111
+查看ascii码表, 找出满足条件的字符组合即可, 例如ionefg, IONEFG
+
+## phase_6
+
+毁灭吧
+
+### part1
+
+### part2
+
+### part3
+
+### part4
+
+### part5
+
